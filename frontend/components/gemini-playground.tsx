@@ -15,6 +15,8 @@ export default function GeminiVoiceChat() {
   const audioInputRef = useRef(null);
   const audioOutputRef = useRef(null);
   const clientId = useRef(crypto.randomUUID());
+  let audioBuffer = []
+  let isPlaying = false
 
   const initializeWebSocket = () => {
     wsRef.current = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
@@ -125,14 +127,30 @@ export default function GeminiVoiceChat() {
   // Play received audio data
   const playAudioData = async (audioData) => {
     console.log('Playing audio data:', audioData.length);
-    if (!audioContextRef.current) return;
+    audioBuffer.push(audioData)
+    if (!isPlaying) {
+      playNextInQueue(); // Start playback if not already playing
+      }
+    }
 
+  const playNextInQueue = async () => {
+    if (!audioContextRef.current || audioBuffer.length == 0) {
+      isPlaying = false;
+      return;
+    }
+
+    isPlaying = true
+    const audioData = audioBuffer.shift()
+    console.log('Playing audio data:', audioData.length);
     const buffer = audioContextRef.current.createBuffer(1, audioData.length, 24000);
     buffer.copyToChannel(audioData, 0);
 
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
+    source.onended = () => {
+      playNextInQueue()
+    }
     source.start();
   };
 

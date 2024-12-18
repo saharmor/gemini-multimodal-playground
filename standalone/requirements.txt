@@ -5,3 +5,4 @@ google-genai==0.2.2
 numpy
 torch
 torchaudio
+numpy==1.24.1
