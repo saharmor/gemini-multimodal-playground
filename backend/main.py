@@ -5,7 +5,7 @@ import json
 import base64
 import os
 from dotenv import load_dotenv
-from websockets.client import connect
+from websockets import connect
 from typing import Dict
 
 load_dotenv()
@@ -34,7 +34,7 @@ class GeminiConnection:
 
     async def connect(self):
         """Initialize connection to Gemini"""
-        self.ws = await connect(self.uri, extra_headers={"Content-Type": "application/json"})
+        self.ws = await connect(self.uri, additional_headers={"Content-Type": "application/json"})
         
         # Send initial setup message
         setup_message = {
