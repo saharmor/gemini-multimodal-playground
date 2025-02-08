@@ -510,7 +510,13 @@ export default function GeminiVoiceChat() {
                       : "Listening to conversation..."}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {isAudioSending ? "Sending audio to Gemini..." : "Audio paused"}
+                    {config.isWakeWordEnabled 
+                      ? wakeWordDetected 
+                        ? "Sending audio to Gemini..." 
+                        : "Waiting for wake word..."
+                      : isAudioSending 
+                        ? "Sending audio to Gemini..." 
+                        : "Audio paused"}
                   </p>
                 </div>
               </div>
