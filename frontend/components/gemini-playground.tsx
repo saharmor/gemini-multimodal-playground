@@ -111,6 +111,11 @@ export default function GeminiVoiceChat() {
       // Get microphone stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      // Share stream with SpeechRecognition if enabled
+      if (config.isWakeWordEnabled && recognitionRef.current) {
+        recognitionRef.current.stream = stream;
+      }
+      
       // Create audio input node
       const source = audioContextRef.current.createMediaStreamSource(stream);
       const processor = audioContextRef.current.createScriptProcessor(512, 1, 1);
@@ -305,7 +310,7 @@ export default function GeminiVoiceChat() {
 
   // Wake word detection
   useEffect(() => {
-    if (config.isWakeWordEnabled && !isConnected) {
+    if (config.isWakeWordEnabled) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       
       if (SpeechRecognition) {
@@ -321,17 +326,27 @@ export default function GeminiVoiceChat() {
             .join(' ')
             .toLowerCase();
           
-          setWakeWordTranscript(transcript); // Update transcript state
+          setWakeWordTranscript(transcript);
           
           if (transcript.includes(config.wakeWord.toLowerCase())) {
             setWakeWordDetected(true);
-            // Clear transcript after detection
             setWakeWordTranscript('');
           }
         };
 
-        recognition.start();
-        recognitionRef.current = recognition;
+        // Handle microphone errors when already in use
+        recognition.onerror = (event) => {
+          if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+            setError('Microphone already in use - disable wake word to continue');
+          }
+        };
+
+        try {
+          recognition.start();
+          recognitionRef.current = recognition;
+        } catch (err) {
+          setError('Microphone access error: ' + err.message);
+        }
       } else {
         setError('Speech recognition not supported in this browser');
       }
@@ -343,7 +358,7 @@ export default function GeminiVoiceChat() {
         recognitionRef.current = null;
       }
     };
-  }, [config.isWakeWordEnabled, isConnected, config.wakeWord]);
+  }, [config.isWakeWordEnabled, config.wakeWord]);
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -533,7 +548,7 @@ export default function GeminiVoiceChat() {
           </Card>
         )}
 
-        {config.isWakeWordEnabled && !wakeWordDetected && (
+        {config.isWakeWordEnabled && (
           <Card>
             <CardContent className="pt-6 space-y-4">
               <h2 className="text-lg font-semibold">Wake Word Debug</h2>
@@ -541,8 +556,13 @@ export default function GeminiVoiceChat() {
                 <p>Listening for: <strong>{config.wakeWord.toLowerCase()}</strong></p>
                 <p className="mt-2">Current transcript:</p>
                 <div className="p-2 bg-gray-50 rounded-md min-h-[40px]">
-                  {wakeWordTranscript || 'Waiting for speech...'}
+                  {isStreaming ? wakeWordTranscript : 'Start chat to begin listening...'}
                 </div>
+                {isStreaming && (
+                  <p className="text-xs text-yellow-600 mt-2">
+                    Note: Transcript may be limited while streaming due to browser microphone constraints
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
