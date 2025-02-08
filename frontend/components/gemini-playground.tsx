@@ -123,19 +123,17 @@ export default function GeminiVoiceChat() {
       
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // Only send audio if wake word is detected or not required
-          if (!config.isWakeWordEnabled || wakeWordDetected) {
+          const shouldSend = !config.isWakeWordEnabled || wakeWordDetected;
+          setIsAudioSending(shouldSend); // Update state immediately
+          
+          if (shouldSend) {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = float32ToPcm16(inputData);
-            // Convert to base64 and send as binary
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
             wsRef.current.send(JSON.stringify({
               type: 'audio',
               data: base64Data
             }));
-            setIsAudioSending(true);
-          } else {
-            setIsAudioSending(false);
           }
         }
       };
