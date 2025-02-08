@@ -87,6 +87,7 @@ export default function GeminiVoiceChat() {
         const audioData = base64ToFloat32Array(response.data);
         playAudioData(audioData);
       } else if (response.type === 'text') {
+        // Ensure we're using the correct field name from the backend
         setText(prev => prev + response.text + '\n');
       }
     };
