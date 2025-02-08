@@ -16,6 +16,8 @@ interface Config {
   voice: string;
   googleSearch: boolean;
   allowInterruptions: boolean;
+  isWakeWordEnabled: boolean;
+  wakeWord: string;
 }
 
 export default function GeminiVoiceChat() {
@@ -26,8 +28,13 @@ export default function GeminiVoiceChat() {
     systemPrompt: "You are a friendly Gemini 2.0 model. Respond verbally in a casual, helpful tone.",
     voice: "Puck",
     googleSearch: true,
-    allowInterruptions: false
+    allowInterruptions: false,
+    isWakeWordEnabled: false,
+    wakeWord: "Gemini"
   });
+  
+  const [wakeWordDetected, setWakeWordDetected] = useState(false);
+  const recognitionRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -109,6 +116,8 @@ export default function GeminiVoiceChat() {
       
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
+          // Only send audio if wake word is detected or not required
+          if (!config.isWakeWordEnabled || wakeWordDetected) {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = float32ToPcm16(inputData);
             // Convert to base64 and send as binary
@@ -117,6 +126,7 @@ export default function GeminiVoiceChat() {
               type: 'audio',
               data: base64Data
             }));
+          }
         }
       };
 
@@ -132,6 +142,13 @@ export default function GeminiVoiceChat() {
 
   // Stop streaming
   const stopStream = () => {
+    // Reset wake word detection
+    setWakeWordDetected(false);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
     if (audioInputRef.current) {
       const { source, processor, stream } = audioInputRef.current;
       source.disconnect();
@@ -284,6 +301,44 @@ export default function GeminiVoiceChat() {
     };
   }, []);
 
+  // Wake word detection
+  useEffect(() => {
+    if (config.isWakeWordEnabled && !isConnected) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map(result => result[0])
+            .map(result => result.transcript)
+            .join(' ')
+            .toLowerCase();
+          
+          if (transcript.includes(config.wakeWord.toLowerCase())) {
+            setWakeWordDetected(true);
+          }
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      } else {
+        setError('Speech recognition not supported in this browser');
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+    };
+  }, [config.isWakeWordEnabled, isConnected, config.wakeWord]);
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="space-y-6">
@@ -339,6 +394,31 @@ export default function GeminiVoiceChat() {
               />
               <Label htmlFor="google-search">Enable Google Search</Label>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="wake-word-enabled"
+                checked={config.isWakeWordEnabled}
+                onCheckedChange={(checked) => 
+                  setConfig(prev => ({ ...prev, isWakeWordEnabled: checked as boolean }))}
+                disabled={isConnected}
+              />
+              <Label htmlFor="wake-word-enabled">Enable Wake Word</Label>
+            </div>
+
+            {config.isWakeWordEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="wake-word">Wake Word</Label>
+                <Textarea
+                  id="wake-word"
+                  value={config.wakeWord}
+                  onChange={(e) => setConfig(prev => ({ ...prev, wakeWord: e.target.value }))}
+                  disabled={isConnected}
+                  className="min-h-[40px]"
+                  placeholder="Enter wake word phrase"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
