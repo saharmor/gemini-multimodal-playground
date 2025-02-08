@@ -133,6 +133,16 @@ export default function GeminiVoiceChat() {
           
           if (shouldSend) {
             const inputData = e.inputBuffer.getChannelData(0);
+            
+            // Add validation
+            if (inputData.every(sample => sample === 0)) {
+              console.error("Silent audio detected - check microphone permissions");
+              return;
+            }
+            
+            // Add audio data logging
+            console.log("Raw audio samples:", inputData.slice(0, 10)); 
+            
             const pcmData = float32ToPcm16(inputData);
             console.log(`Sending audio chunk (${pcmData.byteLength} bytes)`);
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));

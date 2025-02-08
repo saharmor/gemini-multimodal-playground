@@ -133,6 +133,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
     
     try:
+        print(f"Connection state: {websocket.client_state}")
+        
         # Create new Gemini connection for this client
         gemini = GeminiConnection()
         connections[client_id] = gemini
@@ -157,15 +159,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         if websocket.client_state.value == 3:  # WebSocket.CLOSED
                             print("WebSocket connection closed by client")
                             return
-                            
-                        message = await websocket.receive()
-                        
-                        # Check for close message
-                        if message["type"] == "websocket.disconnect":
-                            print("Received disconnect message")
-                            return
-                            
-                        message_content = json.loads(message["text"])
+                    
+                        message_text = await websocket.receive_text()
+                        print(f"Raw received message: {message_text[:100]}...")  # Log first 100 chars
+                
+                        message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
                             print(f"Received audio chunk ({len(message_content['data'])} bytes)")
