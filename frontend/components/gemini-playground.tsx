@@ -34,6 +34,7 @@ export default function GeminiVoiceChat() {
   });
   
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
+  const [wakeWordTranscript, setWakeWordTranscript] = useState('');
   const recognitionRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
@@ -142,7 +143,8 @@ export default function GeminiVoiceChat() {
 
   // Stop streaming
   const stopStream = () => {
-    // Reset wake word detection
+    // Add transcript reset
+    setWakeWordTranscript('');
     setWakeWordDetected(false);
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -319,8 +321,12 @@ export default function GeminiVoiceChat() {
             .join(' ')
             .toLowerCase();
           
+          setWakeWordTranscript(transcript); // Update transcript state
+          
           if (transcript.includes(config.wakeWord.toLowerCase())) {
             setWakeWordDetected(true);
+            // Clear transcript after detection
+            setWakeWordTranscript('');
           }
         };
 
@@ -473,7 +479,11 @@ export default function GeminiVoiceChat() {
             <CardContent className="flex items-center justify-center h-24 mt-6">
               <div className="flex flex-col items-center gap-2">
                 <Mic className="h-8 w-8 text-blue-500 animate-pulse" />
-                <p className="text-gray-600">Listening...</p>
+                <p className="text-gray-600">
+                  {config.isWakeWordEnabled && !wakeWordDetected 
+                    ? "Listening for wake word..."
+                    : "Listening to conversation..."}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -504,6 +514,35 @@ export default function GeminiVoiceChat() {
                   width={640}
                   height={480}
                 />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {wakeWordDetected && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-green-600">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+                Wake word detected! Listening to conversation...
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {config.isWakeWordEnabled && !wakeWordDetected && (
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <h2 className="text-lg font-semibold">Wake Word Debug</h2>
+              <div className="text-sm text-muted-foreground">
+                <p>Listening for: <strong>{config.wakeWord.toLowerCase()}</strong></p>
+                <p className="mt-2">Current transcript:</p>
+                <div className="p-2 bg-gray-50 rounded-md min-h-[40px]">
+                  {wakeWordTranscript || 'Waiting for speech...'}
+                </div>
               </div>
             </CardContent>
           </Card>
