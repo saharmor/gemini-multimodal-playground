@@ -24,6 +24,7 @@ export default function GeminiVoiceChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
   const [text, setText] = useState('');
+  const [isAudioSending, setIsAudioSending] = useState(false);
   const [config, setConfig] = useState<Config>({
     systemPrompt: "You are a friendly Gemini 2.0 model. Respond verbally in a casual, helpful tone.",
     voice: "Puck",
@@ -132,6 +133,9 @@ export default function GeminiVoiceChat() {
               type: 'audio',
               data: base64Data
             }));
+            setIsAudioSending(true);
+          } else {
+            setIsAudioSending(false);
           }
         }
       };
@@ -493,12 +497,24 @@ export default function GeminiVoiceChat() {
           <Card>
             <CardContent className="flex items-center justify-center h-24 mt-6">
               <div className="flex flex-col items-center gap-2">
-                <Mic className="h-8 w-8 text-blue-500 animate-pulse" />
-                <p className="text-gray-600">
-                  {config.isWakeWordEnabled && !wakeWordDetected 
-                    ? "Listening for wake word..."
-                    : "Listening to conversation..."}
-                </p>
+                <div className="relative">
+                  <Mic className={`h-8 w-8 ${isAudioSending ? 'text-green-500' : 'text-blue-500'} animate-pulse`} />
+                  {isAudioSending && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping" />
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <p className="text-gray-600">
+                    {config.isWakeWordEnabled && !wakeWordDetected 
+                      ? "Listening for wake word..."
+                      : "Listening to conversation..."}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {isAudioSending ? "Sending audio to Gemini..." : "Audio paused"}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
