@@ -129,6 +129,7 @@ connections: Dict[str, GeminiConnection] = {}
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    print(f"New connection from {client_id}")
     await websocket.accept()
     
     try:
@@ -167,8 +168,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         message_content = json.loads(message["text"])
                         msg_type = message_content["type"]
                         if msg_type == "audio":
+                            print(f"Received audio chunk ({len(message_content['data'])} bytes)")
                             await gemini.send_audio(message_content["data"])    
                         elif msg_type == "image":
+                            print(f"Received image frame ({len(message_content['data'])} bytes)")
                             await gemini.send_image(message_content["data"])
                         elif msg_type == "text":
                             await gemini.send_text(message_content["data"])
@@ -219,12 +222,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 return
                         
                             if "inlineData" in p:
+                                print(f"Sending audio response ({len(p['inlineData']['data'])} bytes)")
                                 await websocket.send_json({
                                     "type": "audio",
                                     "data": p["inlineData"]["data"]
                                 })
                             elif "text" in p:
-                                print(f"Received text: {p['text']}")
+                                print(f"Sending text response: {p['text']}")
                                 await websocket.send_json({
                                     "type": "text",
                                     "text": p["text"]  # Changed from "data" to "text"

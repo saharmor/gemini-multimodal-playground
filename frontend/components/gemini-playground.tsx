@@ -63,8 +63,10 @@ export default function GeminiVoiceChat() {
     }
 
     wsRef.current = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
+    console.log('WebSocket connecting...');
     
     wsRef.current.onopen = async () => {
+      console.log('WebSocket connected, sending config:', config);
       wsRef.current.send(JSON.stringify({
         type: 'config',
         config: config
@@ -93,11 +95,13 @@ export default function GeminiVoiceChat() {
     };
 
     wsRef.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
       setError('WebSocket error: ' + error.message);
       setIsStreaming(false);
     };
 
-    wsRef.current.onclose = () => {
+    wsRef.current.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason);
       setIsStreaming(false);
     };
   };
@@ -130,6 +134,7 @@ export default function GeminiVoiceChat() {
           if (shouldSend) {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = float32ToPcm16(inputData);
+            console.log(`Sending audio chunk (${pcmData.byteLength} bytes)`);
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
             wsRef.current.send(JSON.stringify({
               type: 'audio',
@@ -198,6 +203,7 @@ export default function GeminiVoiceChat() {
   };
 
   const playAudioData = async (audioData) => {
+    console.log('Received audio response:', audioData.length, 'samples');
     audioBuffer.push(audioData)
     if (!isPlaying) {
       playNextInQueue(); // Start playback if not already playing
