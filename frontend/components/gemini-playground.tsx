@@ -18,6 +18,7 @@ interface Config {
   allowInterruptions: boolean;
   isWakeWordEnabled: boolean;
   wakeWord: string;
+  cancelPhrase: string;
 }
 
 export default function GeminiVoiceChat() {
@@ -31,7 +32,8 @@ export default function GeminiVoiceChat() {
     googleSearch: true,
     allowInterruptions: false,
     isWakeWordEnabled: false,
-    wakeWord: "Gemini"
+    wakeWord: "Gemini",
+    cancelPhrase: "stop listening"
   });
   
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
@@ -349,9 +351,16 @@ export default function GeminiVoiceChat() {
           
           setWakeWordTranscript(transcript);
           
-          if (transcript.includes(config.wakeWord.toLowerCase())) {
-            wakeWordDetectedRef.current = true; // Update ref
-            setWakeWordDetected(true); // Update state
+          // Check if the cancellation phrase is spoken
+          if (transcript.includes(config.cancelPhrase.toLowerCase())) {
+            wakeWordDetectedRef.current = false;
+            setWakeWordDetected(false);
+            setWakeWordTranscript('');
+          }
+          // Otherwise, if the wake word is detected, turn on sending
+          else if (transcript.includes(config.wakeWord.toLowerCase())) {
+            wakeWordDetectedRef.current = true;
+            setWakeWordDetected(true);
             setWakeWordTranscript('');
           }
         };
@@ -451,17 +460,30 @@ export default function GeminiVoiceChat() {
             </div>
 
             {config.isWakeWordEnabled && (
-              <div className="space-y-2">
-                <Label htmlFor="wake-word">Wake Word</Label>
-                <Textarea
-                  id="wake-word"
-                  value={config.wakeWord}
-                  onChange={(e) => setConfig(prev => ({ ...prev, wakeWord: e.target.value }))}
-                  disabled={isConnected}
-                  className="min-h-[40px]"
-                  placeholder="Enter wake word phrase"
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="wake-word">Wake Word</Label>
+                  <Textarea
+                    id="wake-word"
+                    value={config.wakeWord}
+                    onChange={(e) => setConfig(prev => ({ ...prev, wakeWord: e.target.value }))}
+                    disabled={isConnected}
+                    className="min-h-[40px]"
+                    placeholder="Enter wake word phrase"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cancel-phrase">Cancel Phrase</Label>
+                  <Textarea
+                    id="cancel-phrase"
+                    value={config.cancelPhrase}
+                    onChange={(e) => setConfig(prev => ({ ...prev, cancelPhrase: e.target.value }))}
+                    disabled={isConnected}
+                    className="min-h-[40px]"
+                    placeholder="Enter cancellation phrase"
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
