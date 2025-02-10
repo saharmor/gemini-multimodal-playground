@@ -42,6 +42,7 @@ export default function GeminiVoiceChat() {
   const audioContextRef = useRef(null);
   const audioInputRef = useRef(null);
   const clientId = useRef(crypto.randomUUID());
+  const wakeWordDetectedRef = useRef(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -128,7 +129,7 @@ export default function GeminiVoiceChat() {
       
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const shouldSend = !config.isWakeWordEnabled || wakeWordDetected;
+          const shouldSend = !config.isWakeWordEnabled || wakeWordDetectedRef.current;
           setIsAudioSending(shouldSend); // Update state immediately
           
           if (shouldSend) {
@@ -169,6 +170,7 @@ export default function GeminiVoiceChat() {
     // Add transcript reset
     setWakeWordTranscript('');
     setWakeWordDetected(false);
+    wakeWordDetectedRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -348,7 +350,8 @@ export default function GeminiVoiceChat() {
           setWakeWordTranscript(transcript);
           
           if (transcript.includes(config.wakeWord.toLowerCase())) {
-            setWakeWordDetected(true);
+            wakeWordDetectedRef.current = true; // Update ref
+            setWakeWordDetected(true); // Update state
             setWakeWordTranscript('');
           }
         };
@@ -372,6 +375,7 @@ export default function GeminiVoiceChat() {
     }
 
     return () => {
+      wakeWordDetectedRef.current = false; // Add this
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
