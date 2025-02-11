@@ -401,7 +401,7 @@ export default function GeminiVoiceChat() {
   }, [config.wakeWord, config.cancelPhrase]);
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 sm:px-6 md:px-8">
       <div className="space-y-6">
         <h1 className="text-4xl font-bold tracking-tight">Gemini 2.0 Realtime Playground ✨</h1>
         
@@ -496,7 +496,7 @@ export default function GeminiVoiceChat() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4 justify-center">
           {!isStreaming && (
             <>
             <Button
@@ -588,10 +588,7 @@ export default function GeminiVoiceChat() {
                   autoPlay
                   playsInline
                   muted
-                  width={320}
-                  height={240}
-                  className="w-full h-full object-contain"
-                  //style={{ transform: 'scaleX(-1)' }}
+                  className="w-full h-auto object-contain"
                   style={{ transform: videoSource === 'camera' ? 'scaleX(-1)' : 'none' }}
                 />
                 <canvas
