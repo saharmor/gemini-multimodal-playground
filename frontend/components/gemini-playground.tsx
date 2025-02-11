@@ -37,6 +37,27 @@ export default function GeminiVoiceChat() {
   });
   
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
+
+  // Load persisted settings from local storage on mount
+  useEffect(() => {
+    const storedConfig = localStorage.getItem('geminiConfig');
+    if (storedConfig) {
+      const parsed = JSON.parse(storedConfig);
+      setConfig((prev) => ({
+        ...prev,
+        ...parsed,
+      }));
+    }
+  }, []);
+
+  // Persist settings to local storage when they change
+  useEffect(() => {
+    const { systemPrompt, voice, isWakeWordEnabled, wakeWord, cancelPhrase } = config;
+    localStorage.setItem(
+      'geminiConfig',
+      JSON.stringify({ systemPrompt, voice, isWakeWordEnabled, wakeWord, cancelPhrase })
+    );
+  }, [config.systemPrompt, config.voice, config.isWakeWordEnabled, config.wakeWord, config.cancelPhrase]);
   const [wakeWordTranscript, setWakeWordTranscript] = useState('');
   const recognitionRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
