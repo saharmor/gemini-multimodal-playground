@@ -343,11 +343,9 @@ export default function GeminiVoiceChat() {
       recognition.lang = 'en-US';
 
       recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join(' ')
-          .toLowerCase();
+        // Use only the latest result instead of joining all results
+        const latestResult = event.results[event.results.length - 1];
+        const transcript = latestResult[0].transcript.toLowerCase();
       
         // Always update transcript for transcription purposes.
         setWakeWordTranscript(transcript);
