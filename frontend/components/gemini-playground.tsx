@@ -96,13 +96,11 @@ export default function GeminiVoiceChat() {
     };
 
     wsRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
       setError('WebSocket error: ' + error.message);
       setIsStreaming(false);
     };
 
     wsRef.current.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
       setIsStreaming(false);
     };
   };
@@ -137,15 +135,10 @@ export default function GeminiVoiceChat() {
             
             // Add validation
             if (inputData.every(sample => sample === 0)) {
-              console.error("Silent audio detected - check microphone permissions");
               return;
             }
             
-            // Add audio data logging
-            console.log("Raw audio samples:", inputData.slice(0, 10)); 
-            
             const pcmData = float32ToPcm16(inputData);
-            console.log(`Sending audio chunk (${pcmData.byteLength} bytes)`);
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
             wsRef.current.send(JSON.stringify({
               type: 'audio',
