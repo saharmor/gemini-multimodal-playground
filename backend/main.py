@@ -129,11 +129,9 @@ connections: Dict[str, GeminiConnection] = {}
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    print(f"New connection from {client_id}")
     await websocket.accept()
     
     try:
-        print(f"Connection state: {websocket.client_state}")
         
         # Create new Gemini connection for this client
         gemini = GeminiConnection()
@@ -161,15 +159,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             return
                     
                         message_text = await websocket.receive_text()
-                        print(f"Raw received message: {message_text[:100]}...")  # Log first 100 chars
                 
                         message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
-                            print(f"Received audio chunk ({len(message_content['data'])} bytes)")
                             await gemini.send_audio(message_content["data"])    
                         elif msg_type == "image":
-                            print(f"Received image frame ({len(message_content['data'])} bytes)")
                             await gemini.send_image(message_content["data"])
                         elif msg_type == "text":
                             await gemini.send_text(message_content["data"])
@@ -202,7 +197,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     response = json.loads(msg)
             
                     # Add error logging
-                    print(f"Raw Gemini response: {response}")  # Debugging
             
                     try:
                         # Handle different response structures

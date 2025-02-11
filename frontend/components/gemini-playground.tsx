@@ -66,10 +66,8 @@ export default function GeminiVoiceChat() {
     }
 
     wsRef.current = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
-    console.log('WebSocket connecting...');
     
     wsRef.current.onopen = async () => {
-      console.log('WebSocket connected, sending config:', config);
       wsRef.current.send(JSON.stringify({
         type: 'config',
         config: config
@@ -217,7 +215,6 @@ export default function GeminiVoiceChat() {
   };
 
   const playAudioData = async (audioData) => {
-    console.log('Received audio response:', audioData.length, 'samples');
     audioBuffer.push(audioData)
     if (!isPlaying) {
       playNextInQueue(); // Start playback if not already playing
