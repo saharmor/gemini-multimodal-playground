@@ -119,9 +119,9 @@ export default function GeminiVoiceChat() {
 
       // Get microphone stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Share stream with SpeechRecognition if enabled
-      if (config.isWakeWordEnabled && recognitionRef.current) {
+
+      // Always share the audio stream with SpeechRecognition (for transcription)
+      if (recognitionRef.current) {
         recognitionRef.current.stream = stream;
       }
       
@@ -333,64 +333,63 @@ export default function GeminiVoiceChat() {
 
   // Wake word detection
   useEffect(() => {
-    if (config.isWakeWordEnabled) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Always initialize SpeechRecognition for continuous transcription.
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join(' ')
+          .toLowerCase();
       
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join(' ')
-            .toLowerCase();
-          
-          setWakeWordTranscript(transcript);
-          
-          // Check if the cancellation phrase is spoken
-          if (transcript.includes(config.cancelPhrase.toLowerCase())) {
-            wakeWordDetectedRef.current = false;
-            setWakeWordDetected(false);
-            setWakeWordTranscript('');
-          }
-          // Otherwise, if the wake word is detected, turn on sending
-          else if (transcript.includes(config.wakeWord.toLowerCase())) {
-            wakeWordDetectedRef.current = true;
-            setWakeWordDetected(true);
-            setWakeWordTranscript('');
-          }
-        };
-
-        // Handle microphone errors when already in use
-        recognition.onerror = (event) => {
-          if (event.error === 'not-allowed' || event.error === 'audio-capture') {
-            setError('Microphone already in use - disable wake word to continue');
-          }
-        };
-
-        try {
-          recognition.start();
-          recognitionRef.current = recognition;
-        } catch (err) {
-          setError('Microphone access error: ' + err.message);
+        // Always update transcript for transcription purposes.
+        setWakeWordTranscript(transcript);
+      
+        // If cancellation phrase is detected, ensure that audio is not sent
+        if (transcript.includes(config.cancelPhrase.toLowerCase())) {
+          wakeWordDetectedRef.current = false;
+          setWakeWordDetected(false);
+          setWakeWordTranscript('');
+        } 
+        // If wake word is detected, enable sending
+        else if (transcript.includes(config.wakeWord.toLowerCase())) {
+          wakeWordDetectedRef.current = true;
+          setWakeWordDetected(true);
+          setWakeWordTranscript('');
         }
-      } else {
-        setError('Speech recognition not supported in this browser');
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+          setError('Microphone already in use - disable wake word to continue');
+        }
+      };
+
+      try {
+        recognition.start();
+        recognitionRef.current = recognition;
+      } catch (err) {
+        setError('Microphone access error: ' + err.message);
       }
+    } else {
+      setError('Speech recognition not supported in this browser');
     }
 
     return () => {
-      wakeWordDetectedRef.current = false; // Add this
+      wakeWordDetectedRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
     };
-  }, [config.isWakeWordEnabled, config.wakeWord]);
+  }, [config.wakeWord, config.cancelPhrase]);
 
   return (
     <div className="container mx-auto py-8 px-4">
