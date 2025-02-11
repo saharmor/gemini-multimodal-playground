@@ -155,9 +155,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     try:
                         # Check if connection is closed
                         if websocket.client_state.value == 3:  # WebSocket.CLOSED
-                            print("WebSocket connection closed by client")
                             return
-                    
+
                         message_text = await websocket.receive_text()
                 
                         message_content = json.loads(message_text)
