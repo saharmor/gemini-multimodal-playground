@@ -477,7 +477,8 @@ export default function GeminiVoiceChat() {
             wakeWordDetectedRef.current = true;
           }
 
-          if (!((config.allowInterruptions && lcTranscript.includes(config.cancelPhrase.toLowerCase())) ||
+          if ((config.allowInterruptions || config.isWakeWordEnabled) && 
+              !((config.allowInterruptions && lcTranscript.includes(config.cancelPhrase.toLowerCase())) ||
                 (config.isWakeWordEnabled && lcTranscript.includes(config.wakeWord.toLowerCase())))) {
             console.log("Final transcript does not contain wake word or cancel phrase:", transcript);
           }
