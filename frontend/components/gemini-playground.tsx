@@ -257,21 +257,6 @@ export default function GeminiVoiceChat() {
     source.start();
   };
 
-  const handleManualInterrupt = () => {
-    console.log("Manual interruption triggered by button");
-    audioBuffer = [];
-    if (currentAudioSource) {
-      console.log("Stopping current audio source manually.");
-      currentAudioSource.stop();
-      currentAudioSource = null;
-    }
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log("Sending manual interruption text to Gemini");
-      wsRef.current.send(JSON.stringify({
-        type: 'interrupt'
-      }));
-    }
-  };
 
   useEffect(() => {
     if (videoEnabled && videoRef.current) {
@@ -371,46 +356,20 @@ export default function GeminiVoiceChat() {
       recognition.lang = 'en-US';
 
       recognition.onresult = (event) => {
-        // Use only the latest result instead of joining all results
         const latestResult = event.results[event.results.length - 1];
         const transcript = latestResult[0].transcript.toLowerCase();
-        
-        // Always update transcript for transcription purposes.
+        console.log("SpeechRecognition result:", transcript);
         setWakeWordTranscript(transcript);
-        
-        // If cancellation phrase is detected, ensure that audio is not sent
-        if (transcript.includes(config.cancelPhrase.toLowerCase())) {
-          wakeWordDetectedRef.current = false;
-          setWakeWordDetected(false);
-          setWakeWordTranscript('');
-        } 
-        // If wake word is detected, enable sending
-        else if (transcript.includes(config.wakeWord.toLowerCase())) {
-          wakeWordDetectedRef.current = true;
-          setWakeWordDetected(true);
-          setWakeWordTranscript('');
-        }
-
-        const isFinal = latestResult.isFinal;
-        if (
-          isFinal &&
-          config.allowInterruptions &&
-          !transcript.includes(config.cancelPhrase.toLowerCase()) &&
-          !transcript.includes(config.wakeWord.toLowerCase())
-        ) {
-          console.log("Final transcript received for interruption:", transcript);
-          console.log("Interrupting Gemini audio playback...");
-          // Interrupt Gemini's ongoing audio playback:
-          audioBuffer = []; // Clear any queued audio responses
+        if (latestResult.isFinal) {
+          console.log("Final transcript received, triggering interrupt:", transcript);
+          // Interrupt any ongoing Gemini audio playback:
+          audioBuffer = [];
           if (currentAudioSource) {
             currentAudioSource.stop();
             currentAudioSource = null;
           }
-          // Send the new recognized speech to Gemini as a text message
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({
-              type: 'interrupt'
-            }));
+            wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
           }
           setWakeWordTranscript('');
         }
@@ -592,14 +551,6 @@ export default function GeminiVoiceChat() {
               >
                 <StopCircle className="h-4 w-4" />
                 Stop Chat
-              </Button>
-              <Button
-                onClick={handleManualInterrupt}
-                variant="outline"
-                className="gap-2"
-              >
-                <StopCircle className="h-4 w-4" />
-                Manual Interrupt
               </Button>
             </>
           )}
