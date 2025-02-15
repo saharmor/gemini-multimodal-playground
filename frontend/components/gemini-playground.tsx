@@ -226,11 +226,11 @@ export default function GeminiVoiceChat() {
   };
 
   const playAudioData = async (audioData) => {
-    audioBuffer.push(audioData)
-    if (!isPlaying) {
+    audioBufferRef.current.push(audioData);
+    if (!isPlayingRef.current) {
       playNextInQueue(); // Start playback if not already playing
-      }
     }
+  }
 
   const playNextInQueue = async () => {
     if (!audioContextRef.current || audioBufferRef.current.length === 0) {
