@@ -59,6 +59,8 @@ export default function GeminiVoiceChat() {
   }, [config.systemPrompt, config.voice, config.isWakeWordEnabled, config.wakeWord, config.cancelPhrase]);
   const [wakeWordTranscript, setWakeWordTranscript] = useState('');
   const recognitionRef = useRef(null);
+  const lastInterruptTimeRef = useRef<number>(0);
+  const lastWsConnectionAttemptRef = useRef<number>(0);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
