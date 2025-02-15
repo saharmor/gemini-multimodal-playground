@@ -166,7 +166,16 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         elif msg_type == "image":
                             await gemini.send_image(message_content["data"])
                         elif msg_type == "text":
-                            await gemini.send_text(message_content["data"])
+                            if message_content["data"].strip() == "Manual interruption triggered":
+                                print("Received manual interruption command from client, canceling current Gemini generation.")
+                                await gemini.close()
+                                await websocket.send_json({
+                                    "type": "interrupt",
+                                    "text": "Generation canceled."
+                                })
+                                continue
+                            else:
+                                await gemini.send_text(message_content["data"])
                         else:
                             print(f"Unknown message type: {msg_type}")
                     except json.JSONDecodeError as e:
