@@ -24,7 +24,6 @@ interface Config {
 export default function GeminiVoiceChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
-  const [text, setText] = useState('');
   const [isAudioSending, setIsAudioSending] = useState(false);
   const [config, setConfig] = useState<Config>({
     systemPrompt: "You are a friendly Gemini 2.0 model. Respond verbally in a casual, helpful tone.",
@@ -111,9 +110,6 @@ export default function GeminiVoiceChat() {
       if (response.type === 'audio') {
         const audioData = base64ToFloat32Array(response.data);
         playAudioData(audioData);
-      } else if (response.type === 'text') {
-        // Ensure we're using the correct field name from the backend
-        setText(prev => prev + response.text + '\n');
       }
     };
 
@@ -272,8 +268,7 @@ export default function GeminiVoiceChat() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log("Sending manual interruption text to Gemini");
       wsRef.current.send(JSON.stringify({
-        type: 'text',
-        data: 'Manual interruption triggered'
+        type: 'interrupt'
       }));
     }
   };
@@ -414,8 +409,7 @@ export default function GeminiVoiceChat() {
           // Send the new recognized speech to Gemini as a text message
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({
-              type: 'text',
-              data: transcript,
+              type: 'interrupt'
             }));
           }
           setWakeWordTranscript('');
@@ -705,14 +699,6 @@ export default function GeminiVoiceChat() {
           </Card>
         )}
 
-        {text && (
-          <Card>
-            <CardContent className="pt-6">
-              <h2 className="text-lg font-semibold mb-2">Conversation:</h2>
-              <pre className="whitespace-pre-wrap text-gray-700">{text}</pre>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

@@ -109,20 +109,6 @@ class GeminiConnection:
         }
         await self.ws.send(json.dumps(image_message))
 
-    async def send_text(self, text: str):
-        """Send text message to Gemini"""
-        text_message = {
-            "client_content": {
-                "turns": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": text}]
-                    }
-                ],
-                "turn_complete": True
-            }
-        }
-        await self.ws.send(json.dumps(text_message))
 
 # Store active connections
 connections: Dict[str, GeminiConnection] = {}
@@ -165,17 +151,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             await gemini.send_audio(message_content["data"])    
                         elif msg_type == "image":
                             await gemini.send_image(message_content["data"])
-                        elif msg_type == "text":
-                            if message_content["data"].strip() == "Manual interruption triggered":
-                                print("Received manual interruption command from client, canceling current Gemini generation.")
-                                await gemini.close()
-                                await websocket.send_json({
-                                    "type": "interrupt",
-                                    "text": "Generation canceled."
-                                })
-                                continue
-                            else:
-                                await gemini.send_text(message_content["data"])
+                        elif msg_type == "interrupt":
+                            print("Received interrupt command from client, canceling current Gemini generation.")
+                            await gemini.close()
+                            await websocket.send_json({
+                                "type": "interrupt",
+                                "message": "Generation canceled."
+                            })
+                            continue
                         else:
                             print(f"Unknown message type: {msg_type}")
                     except json.JSONDecodeError as e:
@@ -226,12 +209,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 await websocket.send_json({
                                     "type": "audio",
                                     "data": p["inlineData"]["data"]
-                                })
-                            elif "text" in p:
-                                print(f"Sending text response: {p['text']}")
-                                await websocket.send_json({
-                                    "type": "text",
-                                    "text": p["text"]  # Changed from "data" to "text"
                                 })
                     except KeyError as e:
                         print(f"KeyError processing Gemini response: {e}")
