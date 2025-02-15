@@ -367,19 +367,40 @@ export default function GeminiVoiceChat() {
           } else {
             console.log("WebSocket reference is null");
           }
-          // Interrupt any ongoing Gemini audio playback:
-          audioBufferRef.current = [];
-          if (currentAudioSourceRef.current) {
-            console.log("Stopping current audio source due to interrupt.");
-            currentAudioSourceRef.current.stop();
-            currentAudioSourceRef.current = null;
-          }
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
-            console.log("Interrupt message sent to backend via WebSocket.");
+  
+          // Define a helper to send the interrupt.
+          const sendInterrupt = () => {
+            console.log("Active generation detected; sending interrupt.");
+            // Clear the audio buffer & stop any playing source.
+            audioBufferRef.current = [];
+            if (currentAudioSourceRef.current) {
+              console.log("Stopping current audio source due to interrupt.");
+              currentAudioSourceRef.current.stop();
+              currentAudioSourceRef.current = null;
+            }
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
+              console.log("Interrupt message sent to backend via WebSocket.");
+            } else {
+              console.log("WebSocket not open or unavailable for interrupt.");
+            }
+          };
+  
+          // If there is active generation then send the interrupt;
+          // Otherwise, delay a re-check.
+          if (audioBufferRef.current.length > 0 || currentAudioSourceRef.current !== null) {
+            sendInterrupt();
           } else {
-            console.log("WebSocket not open or unavailable for interrupt.");
+            console.log("No active generation detected; scheduling delayed check for interrupt (300ms)...");
+            setTimeout(() => {
+              if (audioBufferRef.current.length > 0 || currentAudioSourceRef.current !== null) {
+                sendInterrupt();
+              } else {
+                console.log("Delayed check: Still no active generation; not sending interrupt.");
+              }
+            }, 300);
           }
+  
           setWakeWordTranscript('');
         }
       };
