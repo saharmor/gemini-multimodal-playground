@@ -32,7 +32,7 @@ export default function GeminiVoiceChat() {
     allowInterruptions: false,
     isWakeWordEnabled: false,
     wakeWord: "Gemini",
-    cancelPhrase: "stop listening"
+    cancelPhrase: "stop"
   });
   
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
@@ -429,7 +429,7 @@ export default function GeminiVoiceChat() {
           const lcTranscript = transcript.toLowerCase();
 
           // If cancellation is allowed and the cancel phrase is detected, send an interrupt
-          if (config.allowInterruptions && lcTranscript.includes(config.cancelPhrase.toLowerCase())) {
+          if (config.cancelPhrase && lcTranscript.includes(config.cancelPhrase.toLowerCase())) {
             if (Date.now() - lastInterruptTimeRef.current < 1000) {
               console.log("Interrupt debounced");
               setWakeWordTranscript('');
