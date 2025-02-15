@@ -77,6 +77,7 @@ export default function GeminiVoiceChat() {
   const voices = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"];
   let audioBuffer = []
   let isPlaying = false
+  let currentAudioSource: AudioBufferSourceNode | null = null;
 
   const startStream = async (mode: 'audio' | 'camera' | 'screen') => {
 
@@ -250,6 +251,7 @@ export default function GeminiVoiceChat() {
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
+    currentAudioSource = source; // <-- New line to store the current audio source
     source.onended = () => {
       playNextInQueue()
     }
@@ -357,10 +359,10 @@ export default function GeminiVoiceChat() {
         // Use only the latest result instead of joining all results
         const latestResult = event.results[event.results.length - 1];
         const transcript = latestResult[0].transcript.toLowerCase();
-      
+        
         // Always update transcript for transcription purposes.
         setWakeWordTranscript(transcript);
-      
+        
         // If cancellation phrase is detected, ensure that audio is not sent
         if (transcript.includes(config.cancelPhrase.toLowerCase())) {
           wakeWordDetectedRef.current = false;
@@ -371,6 +373,29 @@ export default function GeminiVoiceChat() {
         else if (transcript.includes(config.wakeWord.toLowerCase())) {
           wakeWordDetectedRef.current = true;
           setWakeWordDetected(true);
+          setWakeWordTranscript('');
+        }
+
+        const isFinal = latestResult.isFinal;
+        if (
+          isFinal &&
+          config.allowInterruptions &&
+          !transcript.includes(config.cancelPhrase.toLowerCase()) &&
+          !transcript.includes(config.wakeWord.toLowerCase())
+        ) {
+          // Interrupt Gemini's ongoing audio playback
+          audioBuffer = []; // Clear any queued audio responses
+          if (currentAudioSource) {
+            currentAudioSource.stop();
+            currentAudioSource = null;
+          }
+          // Send the new recognized speech to Gemini as a text message
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'text',
+              data: transcript,
+            }));
+          }
           setWakeWordTranscript('');
         }
       };
@@ -454,6 +479,18 @@ export default function GeminiVoiceChat() {
                 disabled={isConnected}
               />
               <Label htmlFor="google-search">Enable Google Search</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allow-interruptions"
+                checked={config.allowInterruptions}
+                onCheckedChange={(checked) =>
+                  setConfig(prev => ({ ...prev, allowInterruptions: checked as boolean }))
+                }
+                disabled={isConnected}
+              />
+              <Label htmlFor="allow-interruptions">Allow Interruptions</Label>
             </div>
 
             <div className="flex items-center space-x-2">
