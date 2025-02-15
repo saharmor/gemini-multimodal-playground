@@ -440,6 +440,9 @@ export default function GeminiVoiceChat() {
             const sendInterrupt = () => {
               console.log("Active generation detected; sending interrupt.");
               audioBufferRef.current = [];
+              wakeWordDetectedRef.current = false;
+              setWakeWordDetected(false);
+              
               if (currentAudioSourceRef.current) {
                 console.log("Stopping current audio source due to interrupt.");
                 currentAudioSourceRef.current.stop();
