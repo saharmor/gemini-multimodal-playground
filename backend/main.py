@@ -95,6 +95,7 @@ class GeminiConnection:
         if self.ws:
             print("Closing Gemini websocket connection.")
             await self.ws.close()
+            self.ws = None
 
     async def send_image(self, image_data: str):
         """Send image data to Gemini"""
@@ -149,7 +150,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
-                            if not gemini.ws:
+                            if not gemini.ws or gemini.ws.closed:
                                 print(f"[Client {client_id}] Gemini connection is closed. Reconnecting...")
                                 await gemini.connect()
                             await gemini.send_audio(message_content["data"])    
