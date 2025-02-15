@@ -149,7 +149,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
-                            if not gemini.ws or gemini.ws.closed:
+                            if not gemini.ws:
                                 print(f"[Client {client_id}] Gemini connection is closed. Reconnecting...")
                                 await gemini.connect()
                             await gemini.send_audio(message_content["data"])    
