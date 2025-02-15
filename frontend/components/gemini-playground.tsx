@@ -238,23 +238,26 @@ export default function GeminiVoiceChat() {
 
   const playNextInQueue = async () => {
     if (!audioContextRef.current || audioBuffer.length == 0) {
+      console.log("No audio context or audioBuffer is empty. Ending playback.");
       isPlaying = false;
       return;
     }
 
-    isPlaying = true
-    const audioData = audioBuffer.shift()
-
+    isPlaying = true;
+    const audioData = audioBuffer.shift();
+    console.log("Playing next audio buffer. Remaining queue length:", audioBuffer.length);
+    
     const buffer = audioContextRef.current.createBuffer(1, audioData.length, 24000);
     buffer.copyToChannel(audioData, 0);
-
+    
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
     currentAudioSource = source; // <-- New line to store the current audio source
     source.onended = () => {
-      playNextInQueue()
-    }
+      console.log("Audio playback ended, checking for next buffer...");
+      playNextInQueue();
+    };
     source.start();
   };
 
