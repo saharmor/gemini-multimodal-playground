@@ -258,6 +258,23 @@ export default function GeminiVoiceChat() {
     source.start();
   };
 
+  const handleManualInterrupt = () => {
+    console.log("Manual interruption triggered by button");
+    audioBuffer = [];
+    if (currentAudioSource) {
+      console.log("Stopping current audio source manually.");
+      currentAudioSource.stop();
+      currentAudioSource = null;
+    }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log("Sending manual interruption text to Gemini");
+      wsRef.current.send(JSON.stringify({
+        type: 'text',
+        data: 'Manual interruption triggered'
+      }));
+    }
+  };
+
   useEffect(() => {
     if (videoEnabled && videoRef.current) {
       const startVideo = async () => {
@@ -383,7 +400,9 @@ export default function GeminiVoiceChat() {
           !transcript.includes(config.cancelPhrase.toLowerCase()) &&
           !transcript.includes(config.wakeWord.toLowerCase())
         ) {
-          // Interrupt Gemini's ongoing audio playback
+          console.log("Final transcript received for interruption:", transcript);
+          console.log("Interrupting Gemini audio playback...");
+          // Interrupt Gemini's ongoing audio playback:
           audioBuffer = []; // Clear any queued audio responses
           if (currentAudioSource) {
             currentAudioSource.stop();
@@ -568,14 +587,24 @@ export default function GeminiVoiceChat() {
           )}
 
           {isStreaming && (
-            <Button
-              onClick={stopStream}
-              variant="destructive"
-              className="gap-2"
-            >
-              <StopCircle className="h-4 w-4" />
-              Stop Chat
-            </Button>
+            <>
+              <Button
+                onClick={stopStream}
+                variant="destructive"
+                className="gap-2"
+              >
+                <StopCircle className="h-4 w-4" />
+                Stop Chat
+              </Button>
+              <Button
+                onClick={handleManualInterrupt}
+                variant="outline"
+                className="gap-2"
+              >
+                <StopCircle className="h-4 w-4" />
+                Manual Interrupt
+              </Button>
+            </>
           )}
         </div>
 
