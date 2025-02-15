@@ -183,14 +183,18 @@ export default function GeminiVoiceChat() {
           const shouldSend = !config.isWakeWordEnabled || wakeWordDetectedRef.current;
           setIsAudioSending(shouldSend); // Update state immediately
           
+          if (!shouldSend) {
+            console.log("Interrupt active or wake word not detected; skipping audio send.");
+          }
+    
           if (shouldSend) {
             const inputData = e.inputBuffer.getChannelData(0);
-            
+      
             // Add validation
             if (inputData.every(sample => sample === 0)) {
               return;
             }
-            
+      
             const pcmData = float32ToPcm16(inputData);
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
             wsRef.current.send(JSON.stringify({

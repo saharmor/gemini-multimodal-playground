@@ -186,8 +186,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         print("WebSocket closed, stopping Gemini receiver")
                         return
 
-                    msg = await gemini.receive()
-                    response = json.loads(msg)
+                    try:
+                        msg = await gemini.receive()
+                        response = json.loads(msg)
+                    except Exception as ex:
+                        print(f"Gemini receive error: {ex}")
+                        break
             
                     # Add error logging
             
@@ -199,6 +203,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 parts = content["modelTurn"]["parts"]
                             elif "candidates" in content:
                                 parts = content["candidates"][0]["content"]["parts"]
+                            else:
+                                parts = []
                         else:
                             parts = []
                 
