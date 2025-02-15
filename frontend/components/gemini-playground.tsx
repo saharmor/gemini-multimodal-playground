@@ -134,7 +134,8 @@ export default function GeminiVoiceChat() {
       });
 
       // Get microphone stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } });
+      console.log("Audio stream started with echo cancellation");
 
       // Always share the audio stream with SpeechRecognition (for transcription)
       if (recognitionRef.current) {
@@ -388,6 +389,30 @@ export default function GeminiVoiceChat() {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+    
+      recognition.onstart = () => {
+        console.log("Speech recognition started");
+      };
+
+      recognition.onend = (event) => {
+        console.log("Speech recognition ended", event);
+        // Restart recognition if streaming is active (helps capture interrupts even when Gemini is talking)
+        if (isStreaming) {
+          try {
+            recognition.start();
+            console.log("Speech recognition restarted");
+          } catch (err) {
+            console.log("Failed to restart speech recognition:", err);
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.log("Speech recognition error:", event.error);
+        if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+          setError('Microphone already in use - disable wake word to continue');
+        }
+      };
 
       recognition.onresult = (event) => {
         const latestResult = event.results[event.results.length - 1];
