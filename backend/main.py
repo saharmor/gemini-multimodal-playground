@@ -93,6 +93,7 @@ class GeminiConnection:
     async def close(self):
         """Close the connection"""
         if self.ws:
+            print("Closing Gemini websocket connection.")
             await self.ws.close()
 
     async def send_image(self, image_data: str):
@@ -152,8 +153,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         elif msg_type == "image":
                             await gemini.send_image(message_content["data"])
                         elif msg_type == "interrupt":
-                            print("Received interrupt command from client, canceling current Gemini generation.")
+                            print(f"[Client {client_id}] Received interrupt command from client, canceling current Gemini generation.")
                             await gemini.close()
+                            print(f"[Client {client_id}] Gemini connection closed due to interrupt.")
                             await websocket.send_json({
                                 "type": "interrupt",
                                 "message": "Generation canceled."

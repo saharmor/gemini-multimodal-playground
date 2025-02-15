@@ -362,14 +362,23 @@ export default function GeminiVoiceChat() {
         setWakeWordTranscript(transcript);
         if (latestResult.isFinal) {
           console.log("Final transcript received, triggering interrupt:", transcript);
+          if (wsRef.current) {
+            console.log("WebSocket readyState before interrupt:", wsRef.current.readyState);
+          } else {
+            console.log("WebSocket reference is null");
+          }
           // Interrupt any ongoing Gemini audio playback:
           audioBufferRef.current = [];
           if (currentAudioSourceRef.current) {
+            console.log("Stopping current audio source due to interrupt.");
             currentAudioSourceRef.current.stop();
             currentAudioSourceRef.current = null;
           }
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
+            console.log("Interrupt message sent to backend via WebSocket.");
+          } else {
+            console.log("WebSocket not open or unavailable for interrupt.");
           }
           setWakeWordTranscript('');
         }
