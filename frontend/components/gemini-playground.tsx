@@ -74,9 +74,9 @@ export default function GeminiVoiceChat() {
   const [videoSource, setVideoSource] = useState<'camera' | 'screen' | null>(null);
 
   const voices = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"];
-  let audioBuffer = []
-  let isPlaying = false
-  let currentAudioSource: AudioBufferSourceNode | null = null;
+  const audioBufferRef = useRef<Float32Array[]>([]);
+  const isPlayingRef = useRef(false);
+  const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const startStream = async (mode: 'audio' | 'camera' | 'screen') => {
 
@@ -233,15 +233,15 @@ export default function GeminiVoiceChat() {
     }
 
   const playNextInQueue = async () => {
-    if (!audioContextRef.current || audioBuffer.length == 0) {
+    if (!audioContextRef.current || audioBufferRef.current.length === 0) {
       console.log("No audio context or audioBuffer is empty. Ending playback.");
-      isPlaying = false;
+      isPlayingRef.current = false;
       return;
     }
 
-    isPlaying = true;
-    const audioData = audioBuffer.shift();
-    console.log("Playing next audio buffer. Remaining queue length:", audioBuffer.length);
+    isPlayingRef.current = true;
+    const audioData = audioBufferRef.current.shift();
+    console.log("Playing next audio buffer. Remaining queue length:", audioBufferRef.current.length);
     
     const buffer = audioContextRef.current.createBuffer(1, audioData.length, 24000);
     buffer.copyToChannel(audioData, 0);
@@ -249,7 +249,7 @@ export default function GeminiVoiceChat() {
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
-    currentAudioSource = source; // <-- New line to store the current audio source
+    currentAudioSourceRef.current = source;
     source.onended = () => {
       console.log("Audio playback ended, checking for next buffer...");
       playNextInQueue();
@@ -363,10 +363,10 @@ export default function GeminiVoiceChat() {
         if (latestResult.isFinal) {
           console.log("Final transcript received, triggering interrupt:", transcript);
           // Interrupt any ongoing Gemini audio playback:
-          audioBuffer = [];
-          if (currentAudioSource) {
-            currentAudioSource.stop();
-            currentAudioSource = null;
+          audioBufferRef.current = [];
+          if (currentAudioSourceRef.current) {
+            currentAudioSourceRef.current.stop();
+            currentAudioSourceRef.current = null;
           }
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
