@@ -31,6 +31,7 @@ class GeminiConnection:
         )
         self.ws = None
         self.config = None
+        self.interrupted = False
 
     async def connect(self):
         """Initialize connection to Gemini"""
@@ -150,6 +151,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
+                            if gemini.interrupted:
+                                gemini.interrupted = False  # Resume with a new generation if audio arrives after an interrupt
                             if not gemini.ws:
                                 print(f"[Client {client_id}] Gemini connection is closed. Reconnecting...")
                                 await gemini.connect()
@@ -158,8 +161,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             await gemini.send_image(message_content["data"])
                         elif msg_type == "interrupt":
                             print(f"[Client {client_id}] Received interrupt command from client, canceling current Gemini generation.")
-                            await gemini.close()
-                            print(f"[Client {client_id}] Gemini connection closed due to interrupt.")
+                            gemini.interrupted = True  # Mark the current generation as canceled
                             await websocket.send_json({
                                 "type": "interrupt",
                                 "message": "Generation canceled."
@@ -215,7 +217,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         for p in parts:
                             if websocket.client_state.value == 3:
                                 return
-                        
+       
+                            # If an interrupt was issued, skip sending any remaining audio chunks.
+                            if gemini.interrupted:
+                                continue
+       
                             if "inlineData" in p:
                                 print(f"Sending audio response ({len(p['inlineData']['data'])} bytes)")
                                 await websocket.send_json({
@@ -228,7 +234,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
                     # Handle turn completion
                     try:
-                        if response.get("serverContent", {}).get("turnComplete"):
+                        if response.get("serverContent", {}).get("turnComplete") and not gemini.interrupted:
                             await websocket.send_json({
                                 "type": "turn_complete",
                                 "data": True
