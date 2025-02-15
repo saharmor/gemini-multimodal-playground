@@ -423,6 +423,9 @@ export default function GeminiVoiceChat() {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
               console.log("Interrupt message sent to backend via WebSocket.");
+              // Close the current WS connection to force reconnection on next audio sample.
+              wsRef.current.close();
+              wsRef.current = null;
             } else {
               console.log("WebSocket not open or unavailable for interrupt.");
             }
