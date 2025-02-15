@@ -144,6 +144,38 @@ export default function GeminiVoiceChat() {
       const processor = audioContextRef.current.createScriptProcessor(512, 1, 1);
       
       processor.onaudioprocess = (e) => {
+        // If websocket is not open, try to reestablish it (once per second)
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          if (Date.now() - lastWsConnectionAttemptRef.current > 1000) {
+            console.log("Reestablishing websocket connection...");
+            const ws = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
+            ws.onopen = async () => {
+              ws.send(JSON.stringify({
+                type: 'config',
+                config: config
+              }));
+            };
+            ws.onmessage = async (event) => {
+              const response = JSON.parse(event.data);
+              if (response.type === 'audio') {
+                const audioData = base64ToFloat32Array(response.data);
+                playAudioData(audioData);
+              } else if (response.type === "interrupt") {
+                console.log("Received interrupt response after reconnect.");
+              }
+            };
+            ws.onerror = (error) => {
+              setError('WebSocket error: ' + error.message);
+            };
+            ws.onclose = (event) => {
+              setIsStreaming(false);
+            };
+            wsRef.current = ws;
+            lastWsConnectionAttemptRef.current = Date.now();
+          }
+          return; // Skip sending until connection is reestablished
+        }
+
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const shouldSend = !config.isWakeWordEnabled || wakeWordDetectedRef.current;
           setIsAudioSending(shouldSend); // Update state immediately
@@ -361,6 +393,14 @@ export default function GeminiVoiceChat() {
         console.log("SpeechRecognition result:", transcript);
         setWakeWordTranscript(transcript);
         if (latestResult.isFinal) {
+          // Debounce rapid interrupts (ignore if last was less than 1 second ago)
+          if (Date.now() - lastInterruptTimeRef.current < 1000) {
+            console.log("Interrupt debounced");
+            setWakeWordTranscript('');
+            return;
+          }
+          lastInterruptTimeRef.current = Date.now();
+
           console.log("Final transcript received, triggering interrupt:", transcript);
           if (wsRef.current) {
             console.log("WebSocket readyState before interrupt:", wsRef.current.readyState);
