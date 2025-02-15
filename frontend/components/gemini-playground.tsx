@@ -391,61 +391,60 @@ export default function GeminiVoiceChat() {
 
       recognition.onresult = (event) => {
         const latestResult = event.results[event.results.length - 1];
-        const transcript = latestResult[0].transcript.toLowerCase();
+        const transcript = latestResult[0].transcript;
         console.log("SpeechRecognition result:", transcript);
         setWakeWordTranscript(transcript);
-        if (latestResult.isFinal) {
-          // Debounce rapid interrupts (ignore if last was less than 1 second ago)
-          if (Date.now() - lastInterruptTimeRef.current < 1000) {
-            console.log("Interrupt debounced");
-            setWakeWordTranscript('');
-            return;
-          }
-          lastInterruptTimeRef.current = Date.now();
 
-          console.log("Final transcript received, triggering interrupt:", transcript);
-          if (wsRef.current) {
-            console.log("WebSocket readyState before interrupt:", wsRef.current.readyState);
-          } else {
-            console.log("WebSocket reference is null");
-          }
-  
-          // Define a helper to send the interrupt.
-          const sendInterrupt = () => {
-            console.log("Active generation detected; sending interrupt.");
-            // Clear the audio buffer & stop any playing source.
-            audioBufferRef.current = [];
-            if (currentAudioSourceRef.current) {
-              console.log("Stopping current audio source due to interrupt.");
-              currentAudioSourceRef.current.stop();
-              currentAudioSourceRef.current = null;
-            }
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
-              console.log("Interrupt message sent to backend via WebSocket.");
-              // Close the current WS connection to force reconnection on next audio sample.
-              wsRef.current.close();
-              wsRef.current = null;
-            } else {
-              console.log("WebSocket not open or unavailable for interrupt.");
-            }
-          };
-  
-          // If there is active generation then send the interrupt;
-          // Otherwise, delay a re-check.
-          if (audioBufferRef.current.length > 0 || currentAudioSourceRef.current !== null) {
-            sendInterrupt();
-          } else {
-            console.log("No active generation detected; scheduling delayed check for interrupt (300ms)...");
-            setTimeout(() => {
+        if (latestResult.isFinal) {
+          const lcTranscript = transcript.toLowerCase();
+          if (config.isWakeWordEnabled) {
+            // Process only if wake word mode is enabled.
+            if (config.allowInterruptions && lcTranscript.includes(config.cancelPhrase.toLowerCase())) {
+              // Cancellation command recognized.
+              if (Date.now() - lastInterruptTimeRef.current < 1000) {
+                console.log("Interrupt debounced");
+                setWakeWordTranscript('');
+                return;
+              }
+              lastInterruptTimeRef.current = Date.now();
+              console.log("Final transcript triggering interrupt (cancel phrase detected):", transcript);
+              const sendInterrupt = () => {
+                console.log("Active generation detected; sending interrupt.");
+                audioBufferRef.current = [];
+                if (currentAudioSourceRef.current) {
+                  console.log("Stopping current audio source due to interrupt.");
+                  currentAudioSourceRef.current.stop();
+                  currentAudioSourceRef.current = null;
+                }
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
+                  console.log("Interrupt message sent to backend via WebSocket.");
+                  wsRef.current.close();
+                  wsRef.current = null;
+                } else {
+                  console.log("WebSocket not open or unavailable for interrupt.");
+                }
+              };
               if (audioBufferRef.current.length > 0 || currentAudioSourceRef.current !== null) {
                 sendInterrupt();
               } else {
-                console.log("Delayed check: Still no active generation; not sending interrupt.");
+                console.log("No active generation detected; scheduling delayed check for interrupt (300ms)...");
+                setTimeout(() => {
+                  if (audioBufferRef.current.length > 0 || currentAudioSourceRef.current !== null) {
+                    sendInterrupt();
+                  } else {
+                    console.log("Delayed check: Still no active generation; not sending interrupt.");
+                  }
+                }, 300);
               }
-            }, 300);
+            } else if (lcTranscript.includes(config.wakeWord.toLowerCase())) {
+              console.log("Wake word detected; enabling audio transmission:", transcript);
+              setWakeWordDetected(true);
+              wakeWordDetectedRef.current = true;
+            } else {
+              console.log("Final transcript does not contain wake word or cancel phrase:", transcript);
+            }
           }
-  
           setWakeWordTranscript('');
         }
       };
