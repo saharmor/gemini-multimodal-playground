@@ -475,6 +475,25 @@ export default function GeminiVoiceChat() {
             console.log("Wake word detected; enabling audio transmission:", transcript);
             setWakeWordDetected(true);
             wakeWordDetectedRef.current = true;
+            
+            // Reset any interrupt state and ensure audio transmission
+            audioBufferRef.current = [];
+            if (currentAudioSourceRef.current) {
+              currentAudioSourceRef.current.stop();
+              currentAudioSourceRef.current = null;
+            }
+            
+            // Force reconnection if needed
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+              console.log("Reconnecting WebSocket after wake word detection");
+              const ws = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
+              ws.onopen = async () => {
+                ws.send(JSON.stringify({ type: 'config', config: config }));
+                setIsStreaming(true);
+                setIsConnected(true);
+              };
+              wsRef.current = ws;
+            }
           }
 
           if ((config.allowInterruptions || config.isWakeWordEnabled) && 
