@@ -31,6 +31,7 @@ class GeminiConnection:
         )
         self.ws = None
         self.config = None
+        self.interrupted = False
 
     async def connect(self):
         """Initialize connection to Gemini"""
@@ -93,7 +94,9 @@ class GeminiConnection:
     async def close(self):
         """Close the connection"""
         if self.ws:
+            print("Closing Gemini websocket connection.")
             await self.ws.close()
+            self.ws = None
 
     async def send_image(self, image_data: str):
         """Send image data to Gemini"""
@@ -109,20 +112,6 @@ class GeminiConnection:
         }
         await self.ws.send(json.dumps(image_message))
 
-    async def send_text(self, text: str):
-        """Send text message to Gemini"""
-        text_message = {
-            "client_content": {
-                "turns": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": text}]
-                    }
-                ],
-                "turn_complete": True
-            }
-        }
-        await self.ws.send(json.dumps(text_message))
 
 # Store active connections
 connections: Dict[str, GeminiConnection] = {}
@@ -132,6 +121,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
     
     try:
+        
         # Create new Gemini connection for this client
         gemini = GeminiConnection()
         connections[client_id] = gemini
@@ -154,24 +144,29 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     try:
                         # Check if connection is closed
                         if websocket.client_state.value == 3:  # WebSocket.CLOSED
-                            print("WebSocket connection closed by client")
                             return
-                            
-                        message = await websocket.receive()
-                        
-                        # Check for close message
-                        if message["type"] == "websocket.disconnect":
-                            print("Received disconnect message")
-                            return
-                            
-                        message_content = json.loads(message["text"])
+
+                        message_text = await websocket.receive_text()
+                
+                        message_content = json.loads(message_text)
                         msg_type = message_content["type"]
                         if msg_type == "audio":
+                            if gemini.interrupted:
+                                gemini.interrupted = False  # Resume with a new generation if audio arrives after an interrupt
+                            if not gemini.ws:
+                                print(f"[Client {client_id}] Gemini connection is closed. Reconnecting...")
+                                await gemini.connect()
                             await gemini.send_audio(message_content["data"])    
                         elif msg_type == "image":
                             await gemini.send_image(message_content["data"])
-                        elif msg_type == "text":
-                            await gemini.send_text(message_content["data"])
+                        elif msg_type == "interrupt":
+                            print(f"[Client {client_id}] Received interrupt command from client, canceling current Gemini generation.")
+                            gemini.interrupted = True  # Mark the current generation as canceled
+                            await websocket.send_json({
+                                "type": "interrupt",
+                                "message": "Generation canceled."
+                            })
+                            continue
                         else:
                             print(f"Unknown message type: {msg_type}")
                     except json.JSONDecodeError as e:
@@ -193,45 +188,60 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         async def receive_from_gemini():
             try:
                 while True:
-                    if websocket.client_state.value == 3:  # WebSocket.CLOSED
+                    if websocket.client_state.value == 3:
                         print("WebSocket closed, stopping Gemini receiver")
                         return
 
-                    msg = await gemini.receive()
-                    response = json.loads(msg)
-                    
-                    # Forward audio data to client
                     try:
-                        parts = response["serverContent"]["modelTurn"]["parts"]
+                        msg = await gemini.receive()
+                        response = json.loads(msg)
+                    except Exception as ex:
+                        print(f"Gemini receive error: {ex}")
+                        break
+            
+                    # Add error logging
+            
+                    try:
+                        # Handle different response structures
+                        if "serverContent" in response:
+                            content = response["serverContent"]
+                            if "modelTurn" in content:
+                                parts = content["modelTurn"]["parts"]
+                            elif "candidates" in content:
+                                parts = content["candidates"][0]["content"]["parts"]
+                            else:
+                                parts = []
+                        else:
+                            parts = []
+                
                         for p in parts:
-                            # Check connection state before each send
                             if websocket.client_state.value == 3:
                                 return
-                                
+       
+                            # If an interrupt was issued, skip sending any remaining audio chunks.
+                            if gemini.interrupted:
+                                continue
+       
                             if "inlineData" in p:
-                                audio_data = p["inlineData"]["data"]
+                                print(f"Sending audio response ({len(p['inlineData']['data'])} bytes)")
                                 await websocket.send_json({
                                     "type": "audio",
-                                    "data": audio_data
+                                    "data": p["inlineData"]["data"]
                                 })
-                            elif "text" in p:
-                                print(f"Received text: {p['text']}")
-                                await websocket.send_json({
-                                    "type": "text",
-                                    "data": p["text"]
-                                })
-                    except KeyError:
-                        pass
+                    except KeyError as e:
+                        print(f"KeyError processing Gemini response: {e}")
+                        continue
 
                     # Handle turn completion
                     try:
-                        if response["serverContent"]["turnComplete"]:
+                        if response.get("serverContent", {}).get("turnComplete") and not gemini.interrupted:
                             await websocket.send_json({
                                 "type": "turn_complete",
                                 "data": True
                             })
-                    except KeyError:
-                        pass
+                    except Exception as e:
+                        print(f"Error processing turn completion: {e}")
+                        continue
             except Exception as e:
                 print(f"Error receiving from Gemini: {e}")
 
