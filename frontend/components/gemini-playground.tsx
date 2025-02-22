@@ -529,7 +529,7 @@ export default function GeminiVoiceChat() {
         recognitionRef.current = null;
       }
     };
-  }, [config.wakeWord, config.cancelPhrase]);
+  }, [config.wakeWord, config.cancelPhrase, isStreaming]);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 md:px-8">
