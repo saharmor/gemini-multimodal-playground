@@ -442,7 +442,7 @@ export default function GeminiVoiceChat() {
               audioBufferRef.current = [];
               wakeWordDetectedRef.current = false;
               setWakeWordDetected(false);
-              
+                
               if (currentAudioSourceRef.current) {
                 console.log("Stopping current audio source due to interrupt.");
                 currentAudioSourceRef.current.stop();
@@ -475,15 +475,34 @@ export default function GeminiVoiceChat() {
             console.log("Wake word detected; enabling audio transmission:", transcript);
             setWakeWordDetected(true);
             wakeWordDetectedRef.current = true;
+              
+            // Reset any interrupt state and ensure audio transmission
+            audioBufferRef.current = [];
+            if (currentAudioSourceRef.current) {
+              currentAudioSourceRef.current.stop();
+              currentAudioSourceRef.current = null;
+            }
+              
+            // Force reconnection if needed
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+              console.log("Reconnecting WebSocket after wake word detection");
+              const ws = new WebSocket(`ws://localhost:8000/ws/${clientId.current}`);
+              ws.onopen = async () => {
+                ws.send(JSON.stringify({ type: 'config', config: config }));
+                setIsStreaming(true);
+                setIsConnected(true);
+              };
+              wsRef.current = ws;
+            }
           }
 
           if ((config.allowInterruptions || config.isWakeWordEnabled) && 
               !((config.allowInterruptions && lcTranscript.includes(config.cancelPhrase.toLowerCase())) ||
                 (config.isWakeWordEnabled && lcTranscript.includes(config.wakeWord.toLowerCase())))) {
             console.log("Final transcript does not contain wake word or cancel phrase:", transcript);
+            // Retain the transcript for debugging
+            setWakeWordTranscript(transcript);
           }
-
-          setWakeWordTranscript('');
         }
       };
 
@@ -510,7 +529,7 @@ export default function GeminiVoiceChat() {
         recognitionRef.current = null;
       }
     };
-  }, [config.wakeWord, config.cancelPhrase]);
+  }, [config.wakeWord, config.cancelPhrase, isStreaming]);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 md:px-8">
