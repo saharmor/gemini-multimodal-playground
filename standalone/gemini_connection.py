@@ -68,8 +68,7 @@ class GeminiConnection:
         try:
             self.ws = await connect(self.uri, additional_headers={"Content-Type": "application/json"})
             
-            generation_config = {} if not self.config["google_search"] else GenerateContentConfig(tools=[google_search_tool])
-
+            # Initialize generation_config with speech settings
             generation_config = {
                 "response_modalities": ["AUDIO"],
                 "speech_config": {
@@ -80,6 +79,10 @@ class GeminiConnection:
                     }
                 }
             }
+            
+            # Add Google Search tool if enabled
+            if self.config["google_search"]:
+                generation_config["tools"] = [google_search_tool]
             
             setup_message = {
                 "setup": {
