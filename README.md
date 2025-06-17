@@ -14,6 +14,15 @@ https://github.com/user-attachments/assets/925e3936-c2b8-4442-adf7-8dacd47f9f92
 
 
 
+## Prerequisites
+
+Before getting started, ensure you have the following:
+
+- **Python 3.12 or higher** - Required for running the application
+- **Node.js 18 or higher** - Needed for the full-stack version frontend
+- **Google Cloud account** - To access Gemini API
+- **Gemini API key** - Get it from Google AI Studio (see instructions below)
+
 ## Getting Your Gemini API Key
 
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
