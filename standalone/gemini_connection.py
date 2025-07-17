@@ -97,7 +97,7 @@ class GeminiConnection:
             
             await self.ws.send(json.dumps(setup_message))
 
-            first_msg = await self.ws.recv()
+            await self.ws.recv()
             print("Connected to Gemini. Speak into your microphone.")
             
             # Signal successful connection
@@ -186,7 +186,7 @@ class GeminiConnection:
                     pass  # Ignore errors during cleanup
             try:
                 audio.terminate()
-            except:
+            except Exception:
                 pass  # Ignore errors during cleanup
 
     async def receive_server_messages(self):
