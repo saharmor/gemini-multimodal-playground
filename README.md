@@ -1,6 +1,17 @@
+<div align="center">
+
 # Gemini Multimodal Playground ✨
 
 A Python application for having voice, video, and screen sharing conversations with Google's new Gemini 2.0 model. Features real-time voice, video, and screen-sharing input with audio responses. Available in two versions: a full-stack web application and a standalone Python script.
+
+<p>
+<a href="https://www.linkedin.com/in/sahar-mor/" target="_blank"><img src="https://img.shields.io/badge/LinkedIn-Connect-blue" alt="LinkedIn"></a>
+<a href="https://x.com/theaievangelist" target="_blank"><img src="https://img.shields.io/twitter/follow/:theaievangelist" alt="X"></a>
+<a href="http://aitidbits.ai/" target="_blank"><img src="https://github.com/saharmor/saharmor.github.io/blob/main/images/ai%20tidbits%20logo.png?raw=true" alt="Stay updated on AI" width="20" height="20" style="vertical-align: middle;"> Stay updated on AI</a>
+</p>
+
+</div>
+
 
 ## Full-Stack Version
 
