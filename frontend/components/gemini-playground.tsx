@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { base64ToFloat32Array, float32ToPcm16 } from '@/lib/utils';
+import { Tooltip } from 'react-tooltip';
 
 interface Config {
   systemPrompt: string;
@@ -25,8 +26,8 @@ export default function GeminiVoiceChat() {
   const [config, setConfig] = useState<Config>({
     systemPrompt: "You are a friendly Gemini 2.0 model. Respond verbally in a casual, helpful tone.",
     voice: "Puck",
-    googleSearch: true,
-    allowInterruptions: false
+    googleSearch: false,
+    allowInterruptions: true
   });
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
@@ -40,10 +41,17 @@ export default function GeminiVoiceChat() {
   const videoIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [chatMode, setChatMode] = useState<'audio' | 'video' | null>(null);
   const [videoSource, setVideoSource] = useState<'camera' | 'screen' | null>(null);
+  const [isGeminiSpeaking, setIsGeminiSpeaking] = useState(false);
+  const [lastInterruptTime, setLastInterruptTime] = useState(0);
+  const isGeminiSpeakingRef = useRef(false);
 
   const voices = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"];
   let audioBuffer = []
   let isPlaying = false
+
+  const log = (message: string) => {
+    console.log(`[${new Date().toISOString()}] ${message}`);
+  };
 
   const startStream = async (mode: 'audio' | 'camera' | 'screen') => {
 
@@ -109,14 +117,37 @@ export default function GeminiVoiceChat() {
       
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const pcmData = float32ToPcm16(inputData);
-            // Convert to base64 and send as binary
-            const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
-            wsRef.current.send(JSON.stringify({
-              type: 'audio',
-              data: base64Data
-            }));
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          const isSpeaking = inputData.some((sample: number) => Math.abs(sample) > 0.25);
+          
+          if (isSpeaking) {
+            log('User voice activity detected');
+            
+            const now = Date.now();
+            log(`Interrupt check - isGeminiSpeaking: ${isGeminiSpeakingRef.current}, allowInterruptions: ${config.allowInterruptions}, timePassed: ${now - lastInterruptTime}`);
+            
+            if (isGeminiSpeakingRef.current && config.allowInterruptions && (now - lastInterruptTime > 1000)) {
+              log('Interrupting Gemini');
+              setLastInterruptTime(now);
+              audioBuffer = [];
+              if (audioContextRef.current) {
+                isPlaying = false;
+                isGeminiSpeakingRef.current = false;
+                setIsGeminiSpeaking(false);
+              }
+              wsRef.current.send(JSON.stringify({
+                type: 'interrupt'
+              }));
+            }
+          }
+
+          const pcmData = float32ToPcm16(inputData);
+          const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+          wsRef.current.send(JSON.stringify({
+            type: 'audio',
+            data: base64Data
+          }));
         }
       };
 
@@ -132,6 +163,9 @@ export default function GeminiVoiceChat() {
 
   // Stop streaming
   const stopStream = () => {
+    log('Stopping all streams');
+    isGeminiSpeakingRef.current = false;
+    setIsGeminiSpeaking(false);
     if (audioInputRef.current) {
       const { source, processor, stream } = audioInputRef.current;
       source.disconnect();
@@ -171,32 +205,71 @@ export default function GeminiVoiceChat() {
   };
 
   const playAudioData = async (audioData) => {
-    audioBuffer.push(audioData)
-    if (!isPlaying) {
-      playNextInQueue(); // Start playback if not already playing
+    log('Received audio data');
+    log(`Current state - isPlaying: ${isPlaying}, isGeminiSpeaking: ${isGeminiSpeakingRef.current}, bufferLength: ${audioBuffer.length}`);
+    
+    if (config.allowInterruptions && isGeminiSpeakingRef.current === false) {
+      log('Skipping audio data during interruption');
+    } else {
+      audioBuffer.push(audioData);
+      log(`Added audio to buffer. New length: ${audioBuffer.length}`);
+      
+      if (!isPlaying) {
+        log('Starting playback queue');
+        if (audioContextRef.current?.state === 'suspended') {
+          log('Resuming suspended audio context');
+          await audioContextRef.current.resume();
+          log(`Audio context state after resume: ${audioContextRef.current.state}`);
+        }
+        playNextInQueue();
       }
     }
+  }
 
   const playNextInQueue = async () => {
-    if (!audioContextRef.current || audioBuffer.length == 0) {
+    log(`playNextInQueue called - buffer length: ${audioBuffer.length}, context state: ${audioContextRef.current?.state}`);
+    
+    if (!audioContextRef.current || audioBuffer.length === 0) {
+      log('No more audio to play');
       isPlaying = false;
+      isGeminiSpeakingRef.current = false;
+      setIsGeminiSpeaking(false);
       return;
     }
 
-    isPlaying = true
-    const audioData = audioBuffer.shift()
+    try {
+      if (audioContextRef.current.state === 'suspended') {
+        log('Resuming audio context');
+        await audioContextRef.current.resume();
+        log(`Audio context state after resume: ${audioContextRef.current.state}`);
+      }
 
-    const buffer = audioContextRef.current.createBuffer(1, audioData.length, 24000);
-    buffer.copyToChannel(audioData, 0);
+      const audioData = audioBuffer.shift();
+      log(`Playing chunk of length: ${audioData.length}`);
+      const buffer = audioContextRef.current.createBuffer(1, audioData.length, 24000);
+      buffer.copyToChannel(audioData, 0);
 
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContextRef.current.destination);
-    source.onended = () => {
-      playNextInQueue()
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContextRef.current.destination);
+      source.onended = () => {
+        log('Audio chunk finished playing');
+        if (audioBuffer.length === 0) {
+          log('Buffer empty, setting Gemini speaking to false');
+          isGeminiSpeakingRef.current = false;
+          setIsGeminiSpeaking(false);
+        }
+        playNextInQueue();
+      }
+      source.start();
+    } catch (err) {
+      log('Error playing audio: ' + err.message);
+      console.error(err); // Log the full error
+      isPlaying = false;
+      isGeminiSpeakingRef.current = false;
+      setIsGeminiSpeaking(false);
     }
-    source.start();
-  };
+  }
 
   useEffect(() => {
     if (videoEnabled && videoRef.current) {
@@ -338,6 +411,27 @@ export default function GeminiVoiceChat() {
                 disabled={isConnected}
               />
               <Label htmlFor="google-search">Enable Google Search</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allow-interruptions"
+                checked={config.allowInterruptions}
+                onCheckedChange={(checked) => 
+                  setConfig(prev => ({ ...prev, allowInterruptions: checked as boolean }))}
+                disabled={isConnected}
+              />
+              <Label 
+                htmlFor="allow-interruptions" 
+                className="cursor-help"
+                data-tooltip-id="interruptions-tooltip"
+              >
+                Allow Interruptions
+              </Label>
+              <Tooltip 
+                id="interruptions-tooltip"
+                content="Best used with earphones to prevent Gemini from hearing itself and self-interrupting"
+              />
             </div>
           </CardContent>
         </Card>
